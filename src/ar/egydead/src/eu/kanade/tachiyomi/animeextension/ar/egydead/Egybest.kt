@@ -1,4 +1,4 @@
-package eu.kanade.tachiyomi.animeextension.ar.egydead
+package eu.kanade.tachiyomi.animeextension.ar.egybest
 
 import android.app.Application
 import android.content.SharedPreferences
@@ -28,9 +28,9 @@ import org.jsoup.nodes.Element
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
-class EgyDead : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
+class egybest : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
 
-    override val name = "Egy Dead"
+    override val name = "egybest"
 
     // TODO: Check frequency of url changes to potentially
     // add back overridable baseurl preference

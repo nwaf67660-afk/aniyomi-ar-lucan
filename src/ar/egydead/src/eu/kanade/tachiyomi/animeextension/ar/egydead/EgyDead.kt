@@ -30,11 +30,11 @@ import uy.kohesive.injekt.api.get
 
 class EgyDead : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
 
-    override val name = "Egy Best"
+    override val name = "Egy Dead"
 
     // TODO: Check frequency of url changes to potentially
     // add back overridable baseurl preference
-    override val baseUrl = "https://www.egymom.com"
+    override val baseUrl = "https://i-egybest.info"
 
     override val lang = "ar"
 

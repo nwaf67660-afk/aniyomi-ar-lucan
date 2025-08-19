@@ -28,7 +28,7 @@ class FastMovies : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
 
     override val name = "Fast Movies"
 
-    override val baseUrl = "https://fastmovies.online"
+    override val baseUrl = "https://www.egymom.com"
 
     override val lang = "ar"
 

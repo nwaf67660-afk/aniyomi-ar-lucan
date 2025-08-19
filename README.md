@@ -1,4 +1,4 @@
-Extensions: https://raw.githubusercontent.com/nwaf67660-afk/aniyomi-ar-lucan/repo/index.min.json
+https://raw.githubusercontent.com/nwaf67660-afk/aniyomi-ar-lucan/repo/index.min.json
 
 # ![app icon](./.github/readme-images/app-icon.png)Arabic Aniyomi Extensions
 Aniyomi is a free and open source manga reader for Android 6.0 and above.

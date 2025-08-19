@@ -1,6 +1,6 @@
 ext {
-    extName = 'Egy Dead'
-    extClass = '.EgyDead'
+    extName = 'Egy Best'
+    extClass = '.EgyBest'
     extVersionCode = 3
 }
 

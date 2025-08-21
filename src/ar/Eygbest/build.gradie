@@ -1,1 +1,7 @@
+ext {
+    extName = 'EgyBest'
+    extClass = '.EgyBest'
+    extVersionCode = 1
+}
 
+apply from: "$rootDir/common.gradle"

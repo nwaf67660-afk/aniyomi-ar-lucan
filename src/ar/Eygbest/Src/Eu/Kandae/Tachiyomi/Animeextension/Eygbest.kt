@@ -32,8 +32,8 @@ class EgyBest : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
 
     override val name = "EgyBest"
 
-    // ⚠️ ملاحظة: دومين إيجي بست يتغير باستمرار، غيّر الرابط هنا إذا وقف
-    override val baseUrl = "https://egybest.org"
+    // 
+    override val baseUrl = "https://www.egymom.com"
 
     override val lang = "ar"
 

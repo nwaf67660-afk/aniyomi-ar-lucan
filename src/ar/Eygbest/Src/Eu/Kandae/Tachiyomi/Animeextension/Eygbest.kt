@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
-import eu.kanade.tachiyomi.animesource.model.AnimeFilter
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
@@ -31,51 +30,39 @@ import uy.kohesive.injekt.api.get
 class EgyBest : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
 
     override val name = "EgyBest"
-
-    // 
     override val baseUrl = "https://www.egymom.com"
-
     override val lang = "ar"
-
     override val supportsLatest = true
+    override val id: Long = 987654321098765432
 
     private val preferences: SharedPreferences by lazy {
-        Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
+        Injekt.get<Application>().getSharedPreferences("source_$id", 0)
     }
 
     // Popular
-    override fun popularAnimeSelector(): String = "div.pin-posts-list li.movieItem"
-
-    override fun popularAnimeNextPageSelector(): String = "div.whatever"
-
-    override fun popularAnimeRequest(page: Int): Request = GET(baseUrl)
-
+    override fun popularAnimeSelector(): String = "div.movieItem"
+    override fun popularAnimeNextPageSelector(): String = "a.next"
+    override fun popularAnimeRequest(page: Int): Request = GET("$baseUrl/page/$page/")
     override fun popularAnimeFromElement(element: Element): SAnime {
         val anime = SAnime.create()
         anime.setUrlWithoutDomain(element.select("a").attr("href"))
-        anime.title = element.select("h1.BottomTitle").text().let { editTitle(it, true) }
+        anime.title = element.select("a img").attr("alt")
         anime.thumbnail_url = element.select("a img").attr("src")
         return anime
     }
 
     // Episodes
-    override fun episodeListSelector() = "div.EpsList li a"
-
     override fun episodeListParse(response: Response): List<SEpisode> {
-        val episodes = mutableListOf<SEpisode>()
         val document = response.asJsoup()
-        document.select(episodeListSelector()).forEach { element ->
-            episodes.add(episodeFromElement(element))
+        return document.select("ul.episodes-list li a").map {
+            SEpisode.create().apply {
+                name = it.text()
+                setUrlWithoutDomain(it.attr("href"))
+            }
         }
-        return episodes
     }
-
-    override fun episodeFromElement(element: Element): SEpisode {
-        val episode = SEpisode.create()
-        episode.setUrlWithoutDomain(element.attr("href"))
-        episode.name = element.text()
-        return episode
-    }
+    override fun episodeListSelector() = "ul.episodes-list li a"
+    override fun episodeFromElement(element: Element): SEpisode = SEpisode.create()
 
     // Videos
     private val streamWishExtractor by lazy { StreamWishExtractor(client, headers) }
@@ -84,99 +71,67 @@ class EgyBest : ConfigurableAnimeSource, ParsedAnimeHttpSource() {
     private val uqloadExtractor by lazy { UqloadExtractor(client) }
     private val urlResolver by lazy { UrlResolver(client) }
 
-    override fun videoListSelector() = "ul.serversList li"
-
     override fun videoListParse(response: Response): List<Video> {
         val requestBody = FormBody.Builder().add("View", "1").build()
         val newHeaders = headers.newBuilder().add("referer", "$baseUrl/").build()
         val newResponse = client.newCall(
             POST(response.request.url.toString(), headers = newHeaders, body = requestBody)
         ).execute().asJsoup()
-        return newResponse.select(videoListSelector()).parallelCatchingFlatMapBlocking(::extractVideos)
-    }
-
-    private fun extractVideos(link: Element): List<Video> {
-        val url = link.attr("data-link")
-        return when {
-            "dood" in url -> doodExtractor.videosFromUrl(url)
-            "mixdrop" in url -> mixDropExtractor.videosFromUrl(url)
-            "uqload" in url -> uqloadExtractor.videosFromUrl(url)
-            else -> streamWishExtractor.videosFromUrl(url)
+        return newResponse.select("ul.servers-list li").parallelCatchingFlatMapBlocking { element ->
+            val url = element.attr("data-link")
+            when {
+                "dood" in url -> doodExtractor.videosFromUrl(url)
+                "mixdrop" in url -> mixDropExtractor.videosFromUrl(url)
+                "uqload" in url -> uqloadExtractor.videosFromUrl(url)
+                else -> streamWishExtractor.videosFromUrl(url)
+            }
         }
     }
-
-    override fun videoFromElement(element: Element) = throw UnsupportedOperationException()
-    override fun videoUrlParse(document: Document) = throw UnsupportedOperationException()
-
+    override fun videoListSelector() = throw UnsupportedOperationException()
+    override fun videoFromElement(element: Element): Video = throw UnsupportedOperationException()
+    override fun videoUrlParse(document: Document): Video = throw UnsupportedOperationException()
     override fun List<Video>.sort(): List<Video> {
         val quality = preferences.getString("preferred_quality", "1080")!!
-        return sortedByDescending { it.quality.contains(quality) }
+        return sortedWith(compareBy { it.quality.contains(quality) }).reversed()
     }
 
     // Search
-    override fun searchAnimeSelector(): String = "div.catHolder li.movieItem"
-    override fun searchAnimeNextPageSelector(): String = "div.pagination-two a:contains(›)"
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
-        val url = if (query.isNotBlank()) {
-            "$baseUrl/page/$page/?s=$query"
-        } else baseUrl
-        return GET(url, headers)
+        return GET("$baseUrl/search/?q=$query&page=$page", headers)
     }
+    override fun searchAnimeSelector(): String = popularAnimeSelector()
+    override fun searchAnimeFromElement(element: Element): SAnime = popularAnimeFromElement(element)
+    override fun searchAnimeNextPageSelector(): String = popularAnimeNextPageSelector()
 
-    override fun searchAnimeFromElement(element: Element) = popularAnimeFromElement(element)
-
-    override fun getFilterList() = AnimeFilterList()
-
-    // Anime details
+    // Details
     override fun animeDetailsParse(document: Document): SAnime {
         val anime = SAnime.create()
-        anime.thumbnail_url = document.select("div.single-thumbnail img").attr("src")
-        anime.title = document.select("div.infoBox div.singleTitle").text()
-        anime.author = document.select("div.LeftBox li:contains(البلد) a").text()
-        anime.artist = document.select("div.LeftBox li:contains(القسم) a").text()
-        anime.genre = document.select("div.LeftBox li a").joinToString(", ") { it.text() }
-        anime.description = document.select("div.infoBox div.extra-content p").text()
-        anime.status =
-            if (anime.title.contains("كامل") || anime.title.contains("فيلم")) SAnime.COMPLETED else SAnime.ONGOING
+        anime.thumbnail_url = document.select("div.thumb img").attr("src")
+        anime.title = document.select("div.details h1").text()
+        anime.genre = document.select("div.details li:contains(Genre) a").joinToString(", ") { it.text() }
+        anime.description = document.select("div.description").text()
+        anime.status = if ("Completed" in anime.title) SAnime.COMPLETED else SAnime.ONGOING
         return anime
     }
 
     // Latest
-    override fun latestUpdatesSelector() = "section.main-section li.movieItem"
-    override fun latestUpdatesNextPageSelector() = "div.pagination ul.page-numbers li a.next"
-    override fun latestUpdatesRequest(page: Int): Request = GET("$baseUrl/?page=$page/")
-    override fun latestUpdatesFromElement(element: Element) = popularAnimeFromElement(element)
-
-    // Utils
-    private fun editTitle(title: String, details: Boolean = false): String {
-        val movieRegex = Regex("(?:فيلم|عرض)\\s(.*?)\\s*(?:\\d{4})*\\s*(مترجم|مدبلج)")
-        val seriesRegex = Regex("(?:مسلسل|برنامج|انمي)\\s(.+)\\sالحلقة\\s(\\d+)")
-        return when {
-            movieRegex.containsMatchIn(title) -> {
-                val (movieName, type) = movieRegex.find(title)!!.destructured
-                movieName + if (details) " ($type)" else ""
-            }
-            seriesRegex.containsMatchIn(title) -> {
-                val (seriesName, epNum) = seriesRegex.find(title)!!.destructured
-                if (details) "$seriesName (ep:$epNum)" else seriesName
-            }
-            else -> title
-        }.trim()
-    }
+    override fun latestUpdatesRequest(page: Int): Request = GET("$baseUrl/latest?page=$page")
+    override fun latestUpdatesSelector(): String = "div.latest-movie"
+    override fun latestUpdatesFromElement(element: Element): SAnime = popularAnimeFromElement(element)
+    override fun latestUpdatesNextPageSelector(): String = "a.next"
 
     // Preferences
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
-        val videoQualityPref = ListPreference(screen.context).apply {
+        ListPreference(screen.context).apply {
             key = "preferred_quality"
             title = "Preferred quality"
-            entries = arrayOf("1080p", "720p", "480p", "360p", "240p", "DoodStream", "Uqload")
-            entryValues = arrayOf("1080", "720", "480", "360", "240", "Dood", "Uqload")
+            entries = arrayOf("1080p", "720p", "480p", "360p", "240p")
+            entryValues = entries.map { it.removeSuffix("p") }.toTypedArray()
             setDefaultValue("1080")
             summary = "%s"
             setOnPreferenceChangeListener { _, newValue ->
-                preferences.edit().putString(key, newValue.toString()).commit()
+                preferences.edit().putString(key, newValue as String).commit()
             }
-        }
-        screen.addPreference(videoQualityPref)
+        }.also(screen::addPreference)
     }
 }
